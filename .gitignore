@@ -1,0 +1,7 @@
+__pycache__/
+dist/
+pingenius.db
+.env
+sample_pin.png
+maybach_pin.png
+*.png
