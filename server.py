@@ -83,8 +83,8 @@ HTML_TEMPLATE = """
             </div>
         </div>
         <div class="flex items-center space-x-3">
-            <button onclick="toggleHistoryModal()" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
-                📜 Campaign History
+            <button id="historyBtn" onclick="toggleHistoryModal()" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center space-x-1.5">
+                <span>📜 Campaign History</span>
             </button>
             <div id="creditBadge" class="hidden px-3 py-1 text-xs font-bold rounded-full bg-slate-800 text-amber-400 border border-amber-500/20">
                 Credits: <span id="creditCount">--</span>
@@ -206,7 +206,7 @@ HTML_TEMPLATE = """
 
     <script>
         let currentTab = 'static';
-        let lastPayload = None = null;
+        let lastPayload = null;
 
         function switchTab(tab) {
             currentTab = tab;
