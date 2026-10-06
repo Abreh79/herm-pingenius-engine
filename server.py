@@ -196,13 +196,50 @@ HTML_TEMPLATE = """
         <div class="bg-cardbg rounded-2xl border border-slate-800 max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
             <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
                 <h3 class="font-bold text-lg text-white">📜 Campaign History Log</h3>
-                <button onclick="document.getElementById('historyModal').style.display='none'" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs transition border border-slate-700">✕ Close</button>
+                <button onclick="closeHistoryDrawer()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs transition border border-slate-700">✕ Close</button>
             </div>
-            <div class="p-6 overflow-y-auto flex-grow space-y-4" id="historyList">
+            <div class="p-6 overflow-y-auto flex-grow space-y-4" id="campaignHistoryList">
                 <p class="text-xs text-slate-400">Loading history...</p>
             </div>
         </div>
     </div>
+
+    <script>
+      function openHistoryDrawer() {
+        const m = document.getElementById('historyModal');
+        if (!m) { alert('Modal element missing'); return; }
+        m.classList.remove('hidden');
+        m.style.display = 'flex';
+        m.style.zIndex = '99999';
+        fetch('/api/campaigns')
+          .then(r => r.json())
+          .then(data => {
+            const list = document.getElementById('campaignHistoryList');
+            if (!list) return;
+            if (!data || !data.campaigns || data.campaigns.length === 0) {
+              list.innerHTML = '<p class="text-gray-400 p-4">No campaigns saved yet. Generate one first!</p>';
+              return;
+            }
+            list.innerHTML = data.campaigns.map(c => `
+              <div class="p-3 bg-gray-800 rounded border border-gray-700 mb-2 flex justify-between items-center">
+                <div>
+                  <p class="font-bold text-white text-sm">${c.topic || 'Untitled'}</p>
+                  <p class="text-xs text-gray-400">${c.timestamp || ''} • ${c.niche || ''}</p>
+                </div>
+                <a href="/api/download?path=${encodeURIComponent(c.zip_path)}" class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold rounded">Download ZIP</a>
+              </div>
+            `).join('');
+          })
+          .catch(err => {
+            console.error(err);
+            alert('Failed to load history: ' + err.message);
+          });
+      }
+      function closeHistoryDrawer() {
+        const m = document.getElementById('historyModal');
+        if (m) { m.style.display = 'none'; m.classList.add('hidden'); }
+      }
+    </script>
 
     <script>
         let currentTab = 'static';
@@ -225,42 +262,6 @@ HTML_TEMPLATE = """
                 staticBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700';
                 carouselSec.classList.remove('hidden');
                 staticSec.classList.add('hidden');
-            }
-        }
-
-        async function openHistoryDrawer() {
-            const modal = document.getElementById('historyModal');
-            if (modal) {
-                modal.style.display = 'flex';
-            }
-            const list = document.getElementById('historyList');
-            if (list) {
-                list.innerHTML = '<p class="text-xs text-slate-400">Fetching past campaigns...</p>';
-            }
-            try {
-                const resp = await fetch('/api/campaigns');
-                const data = await resp.json();
-                if (data.status === 'success' && data.campaigns && data.campaigns.length > 0) {
-                    list.innerHTML = '';
-                    data.campaigns.forEach(c => {
-                        list.innerHTML += `
-                            <div class="bg-slate-900 rounded-xl p-4 border border-slate-800 flex flex-wrap items-center justify-between gap-4">
-                                <div>
-                                    <h4 class="font-bold text-sm text-white">${c.topic} (${c.niche})</h4>
-                                    <p class="text-[11px] text-slate-400 mt-0.5">Engine: ${c.ai_engine} • ${c.timestamp}</p>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <a href="${c.csv_download_url}" download class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg transition border border-slate-700">CSV</a>
-                                    <a href="${c.zip_download_url}" download class="bg-brand hover:bg-red-700 text-white font-bold text-xs px-4 py-1.5 rounded-lg transition shadow">Download ZIP</a>
-                                </div>
-                            </div>
-                        `;
-                    });
-                } else {
-                    if (list) list.innerHTML = '<p class="text-xs text-slate-400">No past campaign runs found.</p>';
-                }
-            } catch (err) {
-                if (list) list.innerHTML = '<p class="text-xs text-red-400">Failed to load history.</p>';
             }
         }
 
