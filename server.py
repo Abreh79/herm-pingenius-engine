@@ -83,7 +83,7 @@ HTML_TEMPLATE = """
             </div>
         </div>
         <div class="flex items-center space-x-3">
-            <button id="historyBtn" onclick="toggleHistoryModal()" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center space-x-1.5">
+            <button id="historyBtn" onclick="openHistoryDrawer()" class="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition flex items-center space-x-1.5">
                 <span>📜 Campaign History</span>
             </button>
             <div id="creditBadge" class="hidden px-3 py-1 text-xs font-bold rounded-full bg-slate-800 text-amber-400 border border-amber-500/20">
@@ -192,11 +192,11 @@ HTML_TEMPLATE = """
     </main>
 
     <!-- History Drawer / Modal -->
-    <div id="historyModal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur flex items-center justify-center p-6">
+    <div id="historyModal" style="display: none;" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur flex items-center justify-center p-6">
         <div class="bg-cardbg rounded-2xl border border-slate-800 max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
             <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
                 <h3 class="font-bold text-lg text-white">📜 Campaign History Log</h3>
-                <button onclick="toggleHistoryModal()" class="text-slate-400 hover:text-white font-bold text-lg">&times;</button>
+                <button onclick="document.getElementById('historyModal').style.display='none'" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-1.5 rounded-lg text-xs transition border border-slate-700">✕ Close</button>
             </div>
             <div class="p-6 overflow-y-auto flex-grow space-y-4" id="historyList">
                 <p class="text-xs text-slate-400">Loading history...</p>
@@ -228,20 +228,19 @@ HTML_TEMPLATE = """
             }
         }
 
-        async function toggleHistoryModal() {
+        async function openHistoryDrawer() {
             const modal = document.getElementById('historyModal');
-            modal.classList.toggle('hidden');
-            if (!modal.classList.contains('hidden')) {
-                loadHistory();
+            if (modal) {
+                modal.style.display = 'flex';
             }
-        }
-
-        async function loadHistory() {
             const list = document.getElementById('historyList');
+            if (list) {
+                list.innerHTML = '<p class="text-xs text-slate-400">Fetching past campaigns...</p>';
+            }
             try {
                 const resp = await fetch('/api/campaigns');
                 const data = await resp.json();
-                if (data.status === 'success' && data.campaigns.length > 0) {
+                if (data.status === 'success' && data.campaigns && data.campaigns.length > 0) {
                     list.innerHTML = '';
                     data.campaigns.forEach(c => {
                         list.innerHTML += `
@@ -258,10 +257,10 @@ HTML_TEMPLATE = """
                         `;
                     });
                 } else {
-                    list.innerHTML = '<p class="text-xs text-slate-400">No past campaign runs found.</p>';
+                    if (list) list.innerHTML = '<p class="text-xs text-slate-400">No past campaign runs found.</p>';
                 }
             } catch (err) {
-                list.innerHTML = '<p class="text-xs text-red-400">Failed to load history.</p>';
+                if (list) list.innerHTML = '<p class="text-xs text-red-400">Failed to load history.</p>';
             }
         }
 
