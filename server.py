@@ -177,6 +177,9 @@ HTML_TEMPLATE = """
                 <button id="tabCarouselBtn" onclick="switchTab('carousel')" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700">
                     Carousel Story Pack (5)
                 </button>
+                <button id="tabMotionBtn" onclick="switchTab('motion')" class="px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+                    Video / Idea Pin (MP4)
+                </button>
             </div>
 
             <!-- Static Pins Section -->
@@ -187,6 +190,11 @@ HTML_TEMPLATE = """
             <!-- Carousel Section -->
             <div id="carouselSection" class="hidden">
                 <div id="carouselGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"></div>
+            </div>
+
+            <!-- Video / Idea Pin Section -->
+            <div id="motionSection" class="hidden">
+                <div id="motionCard" class="max-w-xl mx-auto"></div>
             </div>
         </div>
     </main>
@@ -249,19 +257,27 @@ HTML_TEMPLATE = """
             currentTab = tab;
             const staticBtn = document.getElementById('tabStaticBtn');
             const carouselBtn = document.getElementById('tabCarouselBtn');
+            const motionBtn = document.getElementById('tabMotionBtn');
             const staticSec = document.getElementById('staticPinsSection');
             const carouselSec = document.getElementById('carouselSection');
+            const motionSec = document.getElementById('motionSection');
+
+            [staticBtn, carouselBtn, motionBtn].forEach(btn => {
+                if (btn) btn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700';
+            });
+            [staticSec, carouselSec, motionSec].forEach(sec => {
+                if (sec) sec.classList.add('hidden');
+            });
 
             if (tab === 'static') {
-                staticBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-brand text-white shadow-md';
-                carouselBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700';
-                staticSec.classList.remove('hidden');
-                carouselSec.classList.add('hidden');
-            } else {
-                carouselBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-brand text-white shadow-md';
-                staticBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-slate-800 text-slate-300 hover:bg-slate-700';
-                carouselSec.classList.remove('hidden');
-                staticSec.classList.add('hidden');
+                if (staticBtn) staticBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-brand text-white shadow-md';
+                if (staticSec) staticSec.classList.remove('hidden');
+            } else if (tab === 'carousel') {
+                if (carouselBtn) carouselBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-brand text-white shadow-md';
+                if (carouselSec) carouselSec.classList.remove('hidden');
+            } else if (tab === 'motion') {
+                if (motionBtn) motionBtn.className = 'px-4 py-2 rounded-xl text-xs font-bold transition bg-brand text-white shadow-md';
+                if (motionSec) motionSec.classList.remove('hidden');
             }
         }
 
@@ -402,6 +418,25 @@ HTML_TEMPLATE = """
                         `;
                     });
 
+                    // Render Motion Video Pin Card
+                    const motionCard = document.getElementById('motionCard');
+                    if (data.motion_pin && data.motion_pin.video_url) {
+                        motionCard.innerHTML = `
+                            <div class="bg-cardbg rounded-2xl border border-slate-800 overflow-hidden shadow-xl p-6 flex flex-col items-center">
+                                <div class="relative aspect-[9/16] w-full max-w-sm rounded-xl overflow-hidden bg-slate-950 border border-slate-800 mb-4 shadow-2xl">
+                                    <video src="${data.motion_pin.video_url}" controls autoplay loop muted playsinline class="w-full h-full object-cover"></video>
+                                </div>
+                                <h4 class="text-base font-bold text-white mb-1 text-center">${data.motion_pin.title || 'Kinetic Video Pin'}</h4>
+                                <p class="text-xs text-slate-400 mb-4 text-center line-clamp-2">${data.motion_pin.description || ''}</p>
+                                <a href="${data.motion_pin.download_url}" download class="w-full bg-brand hover:bg-red-700 text-white font-bold py-3 rounded-xl transition text-center shadow-lg shadow-brand/20 flex items-center justify-center space-x-2 text-xs">
+                                    <span>🎥 Download MP4 Video Pin</span>
+                                </a>
+                            </div>
+                        `;
+                    } else {
+                        motionCard.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">No motion pin generated.</p>`;
+                    }
+
                     switchTab('static');
                     results.classList.remove('hidden');
                 } else {
@@ -539,6 +574,20 @@ async def api_generate(request: Request, x_api_key: str = Header(None), x_gemini
             "download_url": f"/api/download?path={slide.get('file_path')}"
         })
         
+    # Format motion video pin if present
+    formatted_motion_pin = None
+    motion_info = manifest_data.get("motion_pin", {})
+    if motion_info and motion_info.get("file_path") and os.path.exists(motion_info["file_path"]):
+        filename = os.path.basename(motion_info["file_path"])
+        formatted_motion_pin = {
+            "title": motion_info.get("title"),
+            "description": motion_info.get("description"),
+            "file_path": motion_info.get("file_path"),
+            "video_url": f"/dist/{filename}",
+            "download_url": f"/api/download?path={motion_info.get('file_path')}",
+            "link_url": motion_info.get("link_url")
+        }
+
     return {
         "status": "success",
         "campaign_id": campaign_id,
@@ -554,14 +603,22 @@ async def api_generate(request: Request, x_api_key: str = Header(None), x_gemini
         },
         "trust_shield_status": shield_res["account_trust_rating"],
         "pins": formatted_pins,
-        "carousel": formatted_carousel
+        "carousel": formatted_carousel,
+        "motion_pin": formatted_motion_pin
     }
 
 @app.get("/api/download")
 def download_file(path: str):
     if os.path.exists(path):
         filename = os.path.basename(path)
-        media_type = "application/zip" if path.endswith(".zip") else ("text/csv" if path.endswith(".csv") else "image/png")
+        if path.endswith(".mp4"):
+            media_type = "video/mp4"
+        elif path.endswith(".zip"):
+            media_type = "application/zip"
+        elif path.endswith(".csv"):
+            media_type = "text/csv"
+        else:
+            media_type = "image/png"
         return FileResponse(path, media_type=media_type, filename=filename)
     return JSONResponse(status_code=404, content={"status": "error", "message": "File not found"})
 

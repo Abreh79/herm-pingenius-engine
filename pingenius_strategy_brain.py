@@ -227,6 +227,20 @@ def analyze_and_generate(topic, niche, intent=None, gemini_key=None, year="2026"
             topic_clean = topic.title()
             hashtags = ai_res.get("hashtags", [f"#{niche_clean.replace(' ', '')}", f"#{topic_clean.replace(' ', '')}", "#tips", "#guide"])
             
+            seo_title = (ai_res.get("seo_title") or f"{topic_clean} | {niche_clean} Guide ({year})")[:100]
+            seo_desc = (ai_res.get("description") or f"Discover top {topic_clean} tips for {niche_clean}.")[:800]
+            alt_text = ai_res.get("alt_text") or f"Pin graphic for {topic_clean}: {ai_res['overlay_hooks'][0]}"
+
+            cleaned_items = []
+            for item in ai_res.get("pin_seo_items", []):
+                cleaned_items.append({
+                    "variant_id": item.get("variant_id"),
+                    "title": (item.get("title") or seo_title)[:100],
+                    "description": (item.get("description") or seo_desc)[:800],
+                    "alt_text": item.get("alt_text") or alt_text,
+                    "keywords": item.get("keywords", "")
+                })
+
             return {
                 "status": "success",
                 "ai_engine": "Gemini 3.6 Flash AI",
@@ -235,15 +249,15 @@ def analyze_and_generate(topic, niche, intent=None, gemini_key=None, year="2026"
                 "topic": topic_clean,
                 "hashtags": hashtags,
                 "pin_metadata": {
-                    "title": ai_res.get("seo_title", f"{topic_clean} | {niche_clean} Guide ({year})"),
-                    "description": ai_res.get("description", f"Discover top {topic_clean} tips for {niche_clean}."),
-                    "alt_text": f"Pin graphic for {topic_clean}: {ai_res['overlay_hooks'][0]}",
+                    "title": seo_title,
+                    "description": seo_desc,
+                    "alt_text": alt_text,
                     "cta_text": ai_res.get("cta_text", "Click to Learn More!"),
                     "recommended_board": f"{niche_clean} Ideas & Inspiration"
                 },
                 "overlay_hooks": ai_res["overlay_hooks"],
                 "seo_keywords": ai_res.get("seo_keywords", [niche.lower(), topic.lower()]),
-                "pin_seo_items": ai_res.get("pin_seo_items", [])
+                "pin_seo_items": cleaned_items
             }
 
     niche_lower = niche.lower().strip()
