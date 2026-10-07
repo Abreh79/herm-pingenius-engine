@@ -121,7 +121,7 @@ HTML_TEMPLATE = """
             </div>
             <p class="text-slate-400 text-sm mb-6">Enter a Website URL or specify topic details to generate high-CTR Pinterest graphic bundles.</p>
             
-            <form id="genForm" class="space-y-4">
+            <form id="genForm" onsubmit="event.preventDefault(); handleGenerate(event);" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="md:col-span-2">
                         <label class="block text-xs font-semibold uppercase text-slate-400 mb-1">Target Website / Landing Page URL (Optional)</label>
@@ -322,17 +322,27 @@ HTML_TEMPLATE = """
             }
         }
 
-        document.getElementById('genForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        async function handleGenerate(e) {
+            if (e && e.preventDefault) {
+                e.preventDefault();
+            }
             const loading = document.getElementById('loading');
             const results = document.getElementById('results');
             const submitBtn = document.getElementById('submitBtn');
             const apiKey = document.getElementById('apiKeyInput').value;
             const geminiKey = document.getElementById('geminiKeyInput').value;
 
+            const originalBtnContent = submitBtn.innerHTML;
             loading.classList.remove('hidden');
             results.classList.add('hidden');
             submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+                <svg class="animate-spin -ml-1 mr-2 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span>Generating Campaign & MP4...</span>
+            `;
 
             const url = document.getElementById('urlInput').value;
             const topic = document.getElementById('topicInput').value;
@@ -447,8 +457,11 @@ HTML_TEMPLATE = """
             } finally {
                 loading.classList.add('hidden');
                 submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnContent;
             }
-        });
+        }
+
+        document.getElementById('genForm').addEventListener('submit', handleGenerate);
 
         checkAccount();
     </script>
