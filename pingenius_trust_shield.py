@@ -6,6 +6,7 @@ Pacing scheduler, image hash perturbation, and anti-shadowban shield.
 
 import argparse
 import json
+import os
 import random
 import time
 from datetime import datetime, timedelta
@@ -91,8 +92,9 @@ def generate_dispatch_plan(manifest_path):
     return shield_report
 
 if __name__ == "__main__":
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     parser = argparse.ArgumentParser(description="PinGenius Trust Shield & Dispatcher")
-    parser.add_argument("--manifest", default="/home/yayock79/pingenius/dist/pin_manifest.json")
+    parser.add_argument("--manifest", default=os.path.join(BASE_DIR, "dist", "pin_manifest.json"))
     
     args = parser.parse_args()
     report = generate_dispatch_plan(args.manifest)

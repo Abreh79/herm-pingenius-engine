@@ -11,9 +11,8 @@ import os
 import urllib.request
 from dotenv import load_dotenv
 
-load_dotenv()
-load_dotenv("/home/yayock79/.hermes/.env")
-load_dotenv("/home/yayock79/herm_pingenius_engine/.env")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 SPECIALIZED_NICHE_HOOKS = {
     "auto detailing": [

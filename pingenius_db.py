@@ -5,10 +5,12 @@ SQLite storage for user keys, tiered credit metering, and campaign history
 """
 
 import json
+import os
 import sqlite3
 import time
 
-DB_PATH = "/home/yayock79/herm_pingenius_engine/pingenius.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "pingenius.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
@@ -39,7 +41,7 @@ def init_db():
     )
     """)
 
-    # Campaign History Table
+    # Campaigns History Table
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS campaigns (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,22 +53,31 @@ def init_db():
         zip_path TEXT,
         csv_path TEXT,
         manifest_json TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
     """)
-    
-    # Seed Master Admin Key if not present
-    cursor.execute("SELECT COUNT(*) FROM users WHERE api_key = 'herm_master_key_777'")
-    if cursor.fetchone()[0] == 0:
-        cursor.execute(
-            "INSERT INTO users (email, api_key, tier, credits) VALUES (?, ?, ?, ?)",
-            ("admin@pingenius.io", "herm_master_key_777", "agency", 999999)
-        )
-        
+
+    # Seed Master Admin Key if environment variable MASTER_API_KEY or PINGENIUS_MASTER_KEY is configured
+    master_key = os.getenv("MASTER_API_KEY") or os.getenv("PINGENIUS_MASTER_KEY")
+    if master_key:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE api_key = ?", (master_key,))
+        if cursor.fetchone()[0] == 0:
+            cursor.execute(
+                "INSERT INTO users (email, api_key, tier, credits) VALUES (?, ?, ?, ?)",
+                ("admin@pingenius.io", master_key, "agency", 999999)
+            )
+
     conn.commit()
     conn.close()
 
 def validate_key(api_key):
+    if not api_key:
+        return {"valid": False, "message": "API key is required"}
+
+    master_key = os.getenv("MASTER_API_KEY") or os.getenv("PINGENIUS_MASTER_KEY")
+    if master_key and api_key == master_key:
+        return {"valid": True, "email": "admin@pingenius.io", "tier": "agency", "credits": 999999}
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT id, email, tier, credits FROM users WHERE api_key = ?", (api_key,))
@@ -74,22 +85,23 @@ def validate_key(api_key):
     conn.close()
     
     if row:
+        user_id, email, tier, credits = row
+        if credits <= 0:
+            return {"valid": False, "message": "Credit quota exhausted. Please top up."}
         return {
             "valid": True,
-            "user_id": row[0],
-            "email": row[1],
-            "tier": row[2],
-            "credits": row[3]
+            "user_id": user_id,
+            "email": email,
+            "tier": tier,
+            "credits": credits
         }
     return {"valid": False, "message": "Invalid API key"}
 
-def create_user(email, tier="free"):
-    credits_map = {"free": 10, "pro": 100, "agency": 999999}
-    credits = credits_map.get(tier, 10)
-    api_key = f"pg_{tier}_{int(time.time())}"
-    
+def create_user(email, tier="starter", credits=100):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
+    api_key = f"pg_{tier}_{int(time.time())}"
+    
     try:
         cursor.execute(
             "INSERT INTO users (email, api_key, tier, credits) VALUES (?, ?, ?, ?)",
@@ -98,66 +110,59 @@ def create_user(email, tier="free"):
         conn.commit()
         conn.close()
         return {"status": "success", "api_key": api_key, "tier": tier, "credits": credits}
-    except sqlite3.IntegrityError:
+    except Exception as e:
         conn.close()
-        return {"status": "error", "message": "User email already registered"}
+        return {"status": "error", "message": str(e)}
 
 def deduct_credits(api_key, amount=1, topic="N/A", niche="N/A"):
     val = validate_key(api_key)
     if not val["valid"]:
-        return {"status": "error", "message": "Invalid API key"}
+        return {"status": "error", "message": val.get("message", "Invalid API key")}
         
-    if val["tier"] == "agency":
-        # Unlimited Tier
-        return {"status": "success", "credits_remaining": 999999}
-        
-    if val["credits"] < amount:
-        return {"status": "error", "message": "Insufficient credits. Please upgrade your tier."}
-        
-    new_credits = val["credits"] - amount
+    master_key = os.getenv("MASTER_API_KEY") or os.getenv("PINGENIUS_MASTER_KEY")
+    if master_key and api_key == master_key:
+        return {"status": "success", "remaining_credits": 999999}
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET credits = ? WHERE id = ?", (new_credits, val["user_id"]))
+    cursor.execute("UPDATE users SET credits = credits - ? WHERE api_key = ?", (amount, api_key))
     cursor.execute(
         "INSERT INTO usage_logs (user_id, topic, niche, pins_generated) VALUES (?, ?, ?, ?)",
-        (val["user_id"], topic, niche, 10)
+        (val["user_id"], topic, niche, amount)
     )
     conn.commit()
+    
+    cursor.execute("SELECT credits FROM users WHERE api_key = ?", (api_key,))
+    new_credits = cursor.fetchone()[0]
     conn.close()
-    return {"status": "success", "credits_remaining": new_credits}
+    
+    return {"status": "success", "remaining_credits": new_credits}
 
 def save_campaign(api_key, topic, niche, url, ai_engine, zip_path, csv_path, manifest_data):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute(
-        """
+    cursor.execute("""
         INSERT INTO campaigns (api_key, topic, niche, url, ai_engine, zip_path, csv_path, manifest_json)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (api_key, topic, niche, url, ai_engine, zip_path, csv_path, json.dumps(manifest_data))
-    )
-    campaign_id = cursor.lastrowid
+    """, (api_key, topic, niche, url, ai_engine, zip_path, csv_path, json.dumps(manifest_data)))
     conn.commit()
     conn.close()
-    return campaign_id
 
 def get_recent_campaigns(limit=10):
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT id, topic, niche, url, ai_engine, zip_path, csv_path, timestamp
-        FROM campaigns
-        ORDER BY id DESC LIMIT ?
-        """,
-        (limit,)
-    )
+    cursor.execute("""
+        SELECT id, topic, niche, url, ai_engine, zip_path, csv_path, manifest_json, created_at 
+        FROM campaigns 
+        ORDER BY created_at DESC 
+        LIMIT ?
+    """, (limit,))
     rows = cursor.fetchall()
     conn.close()
     
-    campaigns = []
+    results = []
     for r in rows:
-        campaigns.append({
+        results.append({
             "id": r[0],
             "topic": r[1],
             "niche": r[2],
@@ -165,12 +170,7 @@ def get_recent_campaigns(limit=10):
             "ai_engine": r[4],
             "zip_path": r[5],
             "csv_path": r[6],
-            "zip_download_url": f"/api/download?path={r[5]}",
-            "csv_download_url": f"/api/download?path={r[6]}",
-            "timestamp": r[7]
+            "manifest": json.loads(r[7]) if r[7] else {},
+            "created_at": r[8]
         })
-    return campaigns
-
-if __name__ == "__main__":
-    init_db()
-    print("Database initialized successfully.")
+    return results

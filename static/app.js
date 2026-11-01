@@ -210,7 +210,7 @@ async function handleGenerate(event) {
   const topic = document.getElementById('topicInput')?.value || '';
   const niche = document.getElementById('nicheInput')?.value || '';
   const url = document.getElementById('urlInput')?.value || '';
-  const apiKey = document.getElementById('apiKeyInput')?.value || 'herm_master_key_777';
+  const apiKey = document.getElementById('apiKeyInput')?.value || '';
   const geminiKey = document.getElementById('geminiKeyInput')?.value || '';
   const btn = document.getElementById('submitBtn') || document.getElementById('generateBtn');
   const loading = document.getElementById('loading');

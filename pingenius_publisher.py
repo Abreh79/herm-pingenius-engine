@@ -17,7 +17,7 @@ def publish_pin_to_pinterest(access_token, board_id, title, description, link_ur
     Publishes a Pin directly via official Pinterest API v5.
     """
     if not access_token:
-        return {"status": "simulated", "message": "No PINTEREST_ACCESS_TOKEN provided. Dry run successful."}
+        return {"status": "error", "message": "PINTEREST_ACCESS_TOKEN environment variable is not configured."}
         
     payload = {
         "board_id": board_id,

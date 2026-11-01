@@ -14,7 +14,8 @@ from pingenius_strategy_brain import analyze_and_generate
 from pingenius_canvas_engine import generate_pin_canvas, THEMES
 from pingenius_motion_engine import generate_motion_pin
 
-OUTPUT_DIR = "/home/yayock79/herm_pingenius_engine/dist"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+OUTPUT_DIR = os.path.join(BASE_DIR, "dist")
 
 LAYOUT_ROTATION = [
     ("editorial_vignette", "dark_bold"),
